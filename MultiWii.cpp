@@ -25,6 +25,7 @@ March  2015     V2.4
 #include "Serial.h"
 #include "GPS.h"
 #include "Protocol.h"
+#include "Debug.h" // for debugging
 
 #include <avr/pgmspace.h>
 
