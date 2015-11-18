@@ -20,12 +20,12 @@ March  2015     V2.4
 #include "IMU.h"
 #include "LCD.h"
 #include "Output.h"
+#include "Debug.h" // for debugging
 #include "RX.h"
 #include "Sensors.h"
 #include "Serial.h"
-#include "GPS.h"
+//#include "GPS.h"
 #include "Protocol.h"
-#include "Debug.h" // for debugging
 
 #include <avr/pgmspace.h>
 
@@ -369,6 +369,7 @@ uint8_t alarmArray[ALRM_FAC_SIZE];           // array
 #endif
 
 void annexCode() { // this code is excetuted at each loop and won't interfere with control loop if it lasts less than 650 microseconds
+  debug_notif("Started the annexCode Loop");
   static uint32_t calibratedAccTime;
   uint16_t tmp,tmp2;
   uint8_t axis,prop1,prop2;
@@ -625,11 +626,9 @@ void annexCode() { // this code is excetuted at each loop and won't interfere wi
     #endif
   }
 }
-
+//char  msg[];
 void setup() {
-  Serial.begin(9600); 
-  while (!Serial) ;  
-  Serial.println("Initializing...");
+
   SerialOpen(0,SERIAL0_COM_SPEED);
   #if defined(PROMICRO)
     SerialOpen(1,SERIAL1_COM_SPEED);
@@ -645,6 +644,7 @@ void setup() {
   STABLEPIN_PINMODE;
   POWERPIN_OFF;
   
+  initDebug();
   initOutput();
   readGlobalSet();
   #ifndef NO_FLASH_CHECK
@@ -686,11 +686,9 @@ void setup() {
   #endif
   readEEPROM();                                 // load setting data from last used profile
   blinkLED(2,40,global_conf.currentSet+1);          
-
   #if GPS
     recallGPSconf();                              //Load GPS configuration parameteres
   #endif
-
   configureReceiver();
   #if defined (PILOTLAMP) 
     PL_INIT;
@@ -754,9 +752,11 @@ void setup() {
   #ifdef DEBUGMSG
     debugmsg_append_str("initialization completed\n");
   #endif
+  debug_notif("Initialization completed");
 }
 
 void go_arm() {
+  debug_notif("In the go_arm routine...");
   if(calibratingG == 0
   #if defined(ONLYARMWHENFLAT)
     && f.ACC_CALIBRATED 
@@ -804,11 +804,13 @@ void go_arm() {
       #endif
     }
   } else if(!f.ARMED) { 
+    debug_notif("Not in the real arming procedure...");
     blinkLED(2,255,1);
     SET_ALARM(ALRM_FAC_ACC, ALRM_LVL_ON);
   }
 }
 void go_disarm() {
+  debug_notif("In the go_disarm routine");
   if (f.ARMED) {
     f.ARMED = 0;
     #ifdef LOG_PERMANENT
@@ -824,34 +826,24 @@ void go_disarm() {
 }
 
 // ******** Main Loop *********
-int ByteReceived;
-#define led 13  // built-in LED
 void loop () {
-  if (Serial.available() > 0)
-  {
-    ByteReceived = Serial.read();
-    Serial.print(ByteReceived);   
-    Serial.print("        ");      
-    Serial.print(ByteReceived, HEX);
-    Serial.print("       ");     
-    Serial.print(char(ByteReceived));
-    
-    if(ByteReceived == '1') // Single Quote! This is a character.
-    {
-      digitalWrite(led,HIGH);
-      Serial.print(" LED ON ");
+  debug_notif("Started the Main Loop");
+  while(true){
+    if (Serial.available() > 0)
+      {
+        int ByteReceived = Serial.read();      
+        if(ByteReceived == '1') // Single Quote! This is a character.
+        {
+          Serial.println("Continuing...");
+          break;
+        }else{
+          Serial.println("Waiting for you to insert a 1");
+        }
+      
+      // END Serial Available
     }
-    
-    if(ByteReceived == '0')
-    {
-      digitalWrite(led,LOW);
-      Serial.print(" LED OFF");
-    }
-    
-    Serial.println();    // End the line
-
-  // END Serial Available
   }
+  
   static uint8_t rcDelayCommand; // this indicates the number of time (multiple of RC measurement at 50Hz) the sticks must be maintained to run or switch off motors
   static uint8_t rcSticks;       // this hold sticks position for command combos
   uint8_t axis,i;
@@ -891,6 +883,7 @@ void loop () {
   #endif
     rcTime = currentTime + 20000;
     computeRC();
+    debug_notif("Computing RC");
     // Failsafe routine - added by MIS
     #if defined(FAILSAFE)
       if ( failsafeCnt > (5*FAILSAFE_DELAY) && f.ARMED) {                  // Stabilize, and set Throttle to specified level
