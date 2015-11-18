@@ -18,7 +18,6 @@ March  2015     V2.4
 #include "Alarms.h"
 #include "EEPROM.h"
 #include "IMU.h"
-#include "LCD.h"
 #include "Output.h"
 #include "Debug.h" // for debugging
 #include "RX.h"
