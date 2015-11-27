@@ -232,26 +232,6 @@ void serialCom() {
         }
         c_state[port] = state;
 
-        // SERIAL: try to detect a new nav frame based on the current received buffer
-        #if defined(GPS_SERIAL)
-        if (GPS_SERIAL == port) {
-          static uint32_t GPS_last_frame_seen; //Last gps frame seen at this time, used to detect stalled gps communication
-          if (GPS_newFrame(c)) {
-            //We had a valid GPS data frame, so signal task scheduler to switch to compute
-            if (GPS_update == 1) GPS_update = 0; else GPS_update = 1; //Blink GPS update
-            GPS_last_frame_seen = timeMax;
-            GPS_Frame = 1;
-          }
-  
-          // Check for stalled GPS, if no frames seen for 1.2sec then consider it LOST
-          if ((timeMax - GPS_last_frame_seen) > 1200000) {
-            //No update since 1200ms clear fix...
-            f.GPS_FIX = 0;
-            GPS_numSat = 0;
-          }
-        }
-        if (micros()-timeMax>250) return;  // Limit the maximum execution time of serial decoding to avoid time spike
-        #endif
       #endif // SUPPRESS_ALL_SERIAL_MSP
     } // while
   } // for

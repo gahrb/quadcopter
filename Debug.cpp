@@ -18,12 +18,12 @@ void initDebug() {
     if (Serial.available() > 0)
       {
         int ByteReceived = Serial.read();      
-        if(ByteReceived == '1') // Single Quote! This is a character.
+        if(ByteReceived == '11') // Single Quote! This is a character.
         {
           Serial.println("Starting Initialization...");
           break;
         }else{
-          Serial.println("Waiting for you to insert a 1");
+          Serial.println("Waiting for you to insert a 9849849");
         }
       
       // END Serial Available

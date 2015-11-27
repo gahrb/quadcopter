@@ -19,7 +19,7 @@ March  2015     V2.4
 #include "EEPROM.h"
 #include "IMU.h"
 #include "Output.h"
-#include "Debug.h" // for debugging
+//#include "Debug.h" // for debugging, added by Bernhard
 #include "RX.h"
 #include "Sensors.h"
 #include "Serial.h"
@@ -368,7 +368,6 @@ uint8_t alarmArray[ALRM_FAC_SIZE];           // array
 #endif
 
 void annexCode() { // this code is excetuted at each loop and won't interfere with control loop if it lasts less than 650 microseconds
-  debug_notif("Started the annexCode Loop");
   static uint32_t calibratedAccTime;
   uint16_t tmp,tmp2;
   uint8_t axis,prop1,prop2;
@@ -643,7 +642,7 @@ void setup() {
   STABLEPIN_PINMODE;
   POWERPIN_OFF;
   
-  initDebug();
+  //initDebug();
   initOutput();
   readGlobalSet();
   #ifndef NO_FLASH_CHECK
@@ -751,11 +750,9 @@ void setup() {
   #ifdef DEBUGMSG
     debugmsg_append_str("initialization completed\n");
   #endif
-  debug_notif("Initialization completed");
 }
 
 void go_arm() {
-  debug_notif("In the go_arm routine...");
   if(calibratingG == 0
   #if defined(ONLYARMWHENFLAT)
     && f.ACC_CALIBRATED 
@@ -803,13 +800,11 @@ void go_arm() {
       #endif
     }
   } else if(!f.ARMED) { 
-    debug_notif("Not in the real arming procedure...");
     blinkLED(2,255,1);
     SET_ALARM(ALRM_FAC_ACC, ALRM_LVL_ON);
   }
 }
 void go_disarm() {
-  debug_notif("In the go_disarm routine");
   if (f.ARMED) {
     f.ARMED = 0;
     #ifdef LOG_PERMANENT
@@ -826,23 +821,6 @@ void go_disarm() {
 
 // ******** Main Loop *********
 void loop () {
-  debug_notif("Started the Main Loop");
-  while(true){
-    if (Serial.available() > 0)
-      {
-        int ByteReceived = Serial.read();      
-        if(ByteReceived == '1') // Single Quote! This is a character.
-        {
-          Serial.println("Continuing...");
-          break;
-        }else{
-          Serial.println("Waiting for you to insert a 1");
-        }
-      
-      // END Serial Available
-    }
-  }
-  
   static uint8_t rcDelayCommand; // this indicates the number of time (multiple of RC measurement at 50Hz) the sticks must be maintained to run or switch off motors
   static uint8_t rcSticks;       // this hold sticks position for command combos
   uint8_t axis,i;
@@ -880,26 +858,26 @@ void loop () {
   #else
   if ((int16_t)(currentTime-rcTime) >0 ) { // 50Hz
   #endif
-    rcTime = currentTime + 20000;
-    computeRC();
-    debug_notif("Computing RC");
-    // Failsafe routine - added by MIS
-    #if defined(FAILSAFE)
-      if ( failsafeCnt > (5*FAILSAFE_DELAY) && f.ARMED) {                  // Stabilize, and set Throttle to specified level
-        for(i=0; i<3; i++) rcData[i] = MIDRC;                               // after specified guard time after RC signal is lost (in 0.1sec)
-        rcData[THROTTLE] = conf.failsafe_throttle;
-        if (failsafeCnt > 5*(FAILSAFE_DELAY+FAILSAFE_OFF_DELAY)) {          // Turn OFF motors after specified Time (in 0.1sec)
-          go_disarm();     // This will prevent the copter to automatically rearm if failsafe shuts it down and prevents
-          f.OK_TO_ARM = 0; // to restart accidentely by just reconnect to the tx - you will have to switch off first to rearm
-        }
-        failsafeEvents++;
+  rcTime = currentTime + 20000;
+  computeRC();
+  //debug_notif("Computing RC");
+  // Failsafe routine - added by MIS
+  #if defined(FAILSAFE)
+    if ( failsafeCnt > (5*FAILSAFE_DELAY) && f.ARMED) {                  // Stabilize, and set Throttle to specified level
+      for(i=0; i<3; i++) rcData[i] = MIDRC;                               // after specified guard time after RC signal is lost (in 0.1sec)
+      rcData[THROTTLE] = conf.failsafe_throttle;
+      if (failsafeCnt > 5*(FAILSAFE_DELAY+FAILSAFE_OFF_DELAY)) {          // Turn OFF motors after specified Time (in 0.1sec)
+        go_disarm();     // This will prevent the copter to automatically rearm if failsafe shuts it down and prevents
+        f.OK_TO_ARM = 0; // to restart accidentely by just reconnect to the tx - you will have to switch off first to rearm
       }
-      if ( failsafeCnt > (5*FAILSAFE_DELAY) && !f.ARMED) {  //Turn of "Ok To arm to prevent the motors from spinning after repowering the RX with low throttle and aux to arm
-          go_disarm();     // This will prevent the copter to automatically rearm if failsafe shuts it down and prevents
-          f.OK_TO_ARM = 0; // to restart accidentely by just reconnect to the tx - you will have to switch off first to rearm
-      }
-      failsafeCnt++;
-    #endif
+      failsafeEvents++;
+    }
+    if ( failsafeCnt > (5*FAILSAFE_DELAY) && !f.ARMED) {  //Turn of "Ok To arm to prevent the motors from spinning after repowering the RX with low throttle and aux to arm
+        go_disarm();     // This will prevent the copter to automatically rearm if failsafe shuts it down and prevents
+        f.OK_TO_ARM = 0; // to restart accidentely by just reconnect to the tx - you will have to switch off first to rearm
+    }
+    failsafeCnt++;
+  #endif
     // end of failsafe routine - next change is made with RcOptions setting
 
     // ------------------ STICKS COMMAND HANDLER --------------------
@@ -927,16 +905,33 @@ void loop () {
         errorAngleI[ROLL] = 0; errorAngleI[PITCH] = 0;
       #endif
       if (conf.activate[BOXARM] > 0) {             // Arming/Disarming via ARM BOX
-        if ( rcOptions[BOXARM] && f.OK_TO_ARM ) go_arm(); else if (f.ARMED) go_disarm();
+        if ( rcOptions[BOXARM] && f.OK_TO_ARM ){
+          go_arm();
+        } else if (f.ARMED){
+          go_disarm();
+        }
       }
     }
+    Serial.print("Throttle: ");
+    Serial.print(rcData[THROTTLE]);
+    Serial.print(" Motor[0]: ");
+    Serial.print(motor[0]);
+    Serial.print(" Motor[1]: ");
+    Serial.print(motor[1]);
+    Serial.print(" Motor[2]: ");
+    Serial.print(motor[2]);
+    Serial.print(" Motor[3]: ");
+    Serial.println(motor[3]);
+    //Serial.print("; rcSticks: ");
+    //Serial.println(rcSticks);
     if(rcDelayCommand == 20) {
+      //Serial.println("rcDelayCommand==20");
       if(f.ARMED) {                   // actions during armed
         #ifdef ALLOW_ARM_DISARM_VIA_TX_YAW
           if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_LO + PIT_CE + ROL_CE) go_disarm();    // Disarm via YAW
         #endif
         #ifdef ALLOW_ARM_DISARM_VIA_TX_ROLL
-          if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_CE + PIT_CE + ROL_LO) go_disarm();    // Disarm via ROLL
+          if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_CE + PIT_LO + ROL_LO) go_disarm();    // Disarm via ROLL
         #endif
       } else {                        // actions during not armed
         i=0;
@@ -982,36 +977,40 @@ void loop () {
           previousTime = micros();
         }
         #ifdef ALLOW_ARM_DISARM_VIA_TX_YAW
-          else if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_HI + PIT_CE + ROL_CE) go_arm();      // Arm via YAW
+        else if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_HI + PIT_CE + ROL_CE){
+          go_arm();      // Arm via YAW
+        }
         #endif
         #ifdef ALLOW_ARM_DISARM_VIA_TX_ROLL
-          else if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_CE + PIT_CE + ROL_HI) go_arm();      // Arm via ROLL
+        else if (conf.activate[BOXARM] == 0 && rcSticks == THR_LO + YAW_CE + PIT_LO + ROL_HI){
+          go_arm();      // Arm via ROLL
+        }
         #endif
         #ifdef LCD_TELEMETRY_AUTO
-          else if (rcSticks == THR_LO + YAW_CE + PIT_HI + ROL_LO) {              // Auto telemetry ON/OFF
-            if (telemetry_auto) {
-              telemetry_auto = 0;
-              telemetry = 0;
-            } else
-              telemetry_auto = 1;
+        else if (rcSticks == THR_LO + YAW_CE + PIT_HI + ROL_LO) {              // Auto telemetry ON/OFF
+          if (telemetry_auto) {
+            telemetry_auto = 0;
+            telemetry = 0;
+          } else {
+             telemetry_auto = 1;
           }
         #endif
         #ifdef LCD_TELEMETRY_STEP
-          else if (rcSticks == THR_LO + YAW_CE + PIT_HI + ROL_HI) {              // Telemetry next step
-            telemetry = telemetryStepSequence[++telemetryStepIndex % strlen(telemetryStepSequence)];
-            #if defined( OLED_I2C_128x64)
-              if (telemetry != 0) i2c_OLED_init();
-            #elif defined(OLED_DIGOLE)
-              if (telemetry != 0) i2c_OLED_DIGOLE_init();
-            #endif
-            LCDclear();
-          }
+        else if (rcSticks == THR_LO + YAW_CE + PIT_HI + ROL_HI) {              // Telemetry next step
+          telemetry = telemetryStepSequence[++telemetryStepIndex % strlen(telemetryStepSequence)];
+          #if defined( OLED_I2C_128x64)
+            if (telemetry != 0) i2c_OLED_init();
+          #elif defined(OLED_DIGOLE)
+            if (telemetry != 0) i2c_OLED_DIGOLE_init();
+          #endif
+          LCDclear();
+        }
         #endif
         #if ACC
-          else if (rcSticks == THR_HI + YAW_LO + PIT_LO + ROL_CE) calibratingA=512;     // throttle=max, yaw=left, pitch=min
+        else if (rcSticks == THR_HI + YAW_LO + PIT_LO + ROL_CE) calibratingA=512;     // throttle=max, yaw=left, pitch=min
         #endif
         #if MAG
-          else if (rcSticks == THR_HI + YAW_HI + PIT_LO + ROL_CE) f.CALIBRATE_MAG = 1;  // throttle=max, yaw=right, pitch=min
+        else if (rcSticks == THR_HI + YAW_HI + PIT_LO + ROL_CE) f.CALIBRATE_MAG = 1;  // throttle=max, yaw=right, pitch=min
         #endif
         i=0;
         if      (rcSticks == THR_HI + YAW_CE + PIT_HI + ROL_CE) {conf.angleTrim[PITCH]+=2; i=1;}
